@@ -1,0 +1,88 @@
+@import "tailwindcss";
+
+:root {
+  --background: #e8d5a8;
+  --foreground: #3d2914;
+  --card: #f7edd3;
+  --card-foreground: #3d2914;
+  --primary: #b8860b;
+  --primary-foreground: #fff8e7;
+  --secondary: #efe1bf;
+  --secondary-foreground: #5c4528;
+  --muted: #dcc9a0;
+  --muted-foreground: #7a6244;
+  --accent: #d4a017;
+  --accent-foreground: #3d2914;
+  --border: #c4a56a;
+  --input: #d8c18d;
+  --ring: #b8860b;
+  --destructive: #a63d2f;
+}
+
+@theme inline {
+  --color-background: var(--background);
+  --color-foreground: var(--foreground);
+  --color-card: var(--card);
+  --color-card-foreground: var(--card-foreground);
+  --color-primary: var(--primary);
+  --color-primary-foreground: var(--primary-foreground);
+  --color-secondary: var(--secondary);
+  --color-secondary-foreground: var(--secondary-foreground);
+  --color-muted: var(--muted);
+  --color-muted-foreground: var(--muted-foreground);
+  --color-accent: var(--accent);
+  --color-accent-foreground: var(--accent-foreground);
+  --color-border: var(--border);
+  --color-input: var(--input);
+  --color-ring: var(--ring);
+  --color-destructive: var(--destructive);
+  --font-serif: var(--font-serif);
+  --font-mono: var(--font-mono);
+}
+
+html {
+  min-height: 100%;
+  background-color: var(--background);
+}
+
+body {
+  min-height: 100%;
+  background:
+    radial-gradient(
+      ellipse 140% 90% at 50% -30%,
+      rgba(255, 248, 231, 0.45),
+      transparent 55%
+    ),
+    radial-gradient(
+      ellipse 100% 50% at 50% 110%,
+      rgba(180, 145, 85, 0.12),
+      transparent 50%
+    ),
+    var(--background);
+  background-attachment: fixed;
+  color: var(--foreground);
+  font-family: var(--font-mono), ui-monospace, monospace;
+}
+
+body::before {
+  content: "";
+  pointer-events: none;
+  position: fixed;
+  inset: 0;
+  z-index: -1;
+  opacity: 0.06;
+  background-image:
+    linear-gradient(rgba(61, 41, 20, 0.12) 1px, transparent 1px),
+    linear-gradient(90deg, rgba(61, 41, 20, 0.12) 1px, transparent 1px);
+  background-size: 28px 28px;
+}
+
+.retro-paper {
+  background:
+    linear-gradient(180deg, rgba(255, 255, 255, 0.35), transparent 18%),
+    var(--card);
+}
+
+.font-serif {
+  font-family: var(--font-serif), "Iowan Old Style", "Palatino Linotype", serif;
+}

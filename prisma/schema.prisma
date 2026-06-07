@@ -1,0 +1,48 @@
+// This is your Prisma schema file,
+// learn more about it in the docs: https://pris.ly/d/prisma-schema
+
+// Get a free hosted Postgres database in seconds: `npx create-db`
+
+generator client {
+  provider        = "prisma-client"
+  output          = "../src/generated/prisma"
+  previewFeatures = ["postgresqlExtensions"]
+}
+
+datasource db {
+  provider   = "postgresql"
+  extensions = [vector(schema: "extensions")]
+}
+
+model Note {
+  id        String                       @id @default(uuid())
+  title     String
+  content   String
+  // 384 dims = Xenova/all-MiniLM-L6-v2. Query via $queryRaw.
+  embedding Unsupported("vector(384)")?
+  createdAt DateTime                     @default(now())
+  updatedAt DateTime                     @updatedAt
+  noteTags  NoteTag[]
+
+  @@map("notes")
+}
+
+model Tag {
+  id        String    @id @default(uuid())
+  name      String
+  createdAt DateTime  @default(now())
+  updatedAt DateTime  @updatedAt
+  noteTags  NoteTag[]
+
+  @@map("tags")
+}
+
+model NoteTag {
+  noteId String
+  tagId  String
+  note   Note   @relation(fields: [noteId], references: [id])
+  tag    Tag    @relation(fields: [tagId], references: [id])
+
+  @@id([noteId, tagId])
+  @@map("note_tags")
+}
