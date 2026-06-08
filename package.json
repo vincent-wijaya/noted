@@ -14,11 +14,11 @@
     "postinstall": "prisma generate"
   },
   "dependencies": {
+    "@huggingface/transformers": "^4.2.0",
     "@prisma/adapter-pg": "^7.8.0",
     "@prisma/client": "7.8.0",
     "@radix-ui/react-slot": "^1.2.5",
     "@t3-oss/env-nextjs": "^0.13.11",
-    "@xenova/transformers": "^2.17.2",
     "class-variance-authority": "^0.7.1",
     "clsx": "^2.1.1",
     "dotenv": "^17.4.2",

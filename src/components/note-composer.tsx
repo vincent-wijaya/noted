@@ -3,6 +3,8 @@
 import { useCallback, useEffect, useMemo, useState } from "react";
 import { CalendarDays, Loader2, NotebookPen, Sparkles } from "lucide-react";
 
+import { embedText } from "@/src/lib/embeddings";
+
 import { Button } from "@/src/components/ui/button";
 import {
   Card,
@@ -156,16 +158,25 @@ export function NoteComposer() {
     setIsSearching(true);
     const timer = window.setTimeout(async () => {
       try {
-        const response = await fetch(
-          `/api/notes?query=${encodeURIComponent(trimmed)}&limit=5`,
-        );
+        const embedding = await embedText(trimmed);
+        const response = await fetch("/api/notes/search", {
+          method: "POST",
+          headers: { "Content-Type": "application/json" },
+          body: JSON.stringify({
+            query: trimmed,
+            ...(embedding ? { embedding } : {}),
+            limit: 5,
+          }),
+        });
 
         if (!response.ok) {
           throw new Error("Search failed");
         }
 
         const results = (await response.json()) as Note[];
-        setSimilarNotes(results.filter((note) => (note.similarity ?? 0) > 0.35));
+        setSimilarNotes(
+          results.filter((note) => (note.similarity ?? 0) > 0.35),
+        );
       } catch {
         setSimilarNotes([]);
       } finally {
@@ -187,10 +198,15 @@ export function NoteComposer() {
     setMessage(null);
 
     try {
+      const embedding = await embedText(content);
       const response = await fetch("/api/notes", {
         method: "POST",
         headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({ title, content }),
+        body: JSON.stringify({
+          title,
+          content,
+          ...(embedding ? { embedding } : {}),
+        }),
       });
 
       if (!response.ok) {
