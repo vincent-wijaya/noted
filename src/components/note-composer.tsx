@@ -1,9 +1,11 @@
 "use client";
 
 import { useCallback, useEffect, useMemo, useState } from "react";
-import { CalendarDays, Loader2, NotebookPen, Sparkles } from "lucide-react";
+import { CalendarDays, Loader2, NotebookPen, Sparkles, Trash2 } from "lucide-react";
+import { AnimatePresence, motion } from "motion/react";
 
 import { embedText } from "@/src/lib/embeddings";
+import { cn } from "@/src/lib/utils";
 
 import { Button } from "@/src/components/ui/button";
 import {
@@ -89,15 +91,56 @@ function groupNotesByDate(notes: Note[]) {
   return groups;
 }
 
+const noteListTransition = { duration: 0.24, ease: "easeOut" as const };
+const noteLayoutTransition = { layout: { duration: 0.24, ease: "easeOut" as const } };
+
+function AnimatedNoteItem({ children }: { children: React.ReactNode }) {
+  return (
+    <motion.div
+      layout
+      initial={{ opacity: 0, y: -14 }}
+      animate={{ opacity: 1, y: 0 }}
+      exit={{ opacity: 0, y: 14 }}
+      transition={{ ...noteListTransition, ...noteLayoutTransition }}
+    >
+      {children}
+    </motion.div>
+  );
+}
+
 function NoteCard({
   note,
   showSimilarity = false,
+  onDelete,
+  isDeleting = false,
 }: {
   note: Note;
   showSimilarity?: boolean;
+  onDelete?: (id: string) => void;
+  isDeleting?: boolean;
 }) {
   return (
-    <Card className="retro-paper">
+    <Card className="retro-paper group relative">
+      {onDelete ? (
+        <Button
+          type="button"
+          variant="ghost"
+          size="sm"
+          disabled={isDeleting}
+          onClick={() => onDelete(note.id)}
+          className={cn(
+            "text-muted-foreground absolute right-2 bottom-2 size-8 p-0 opacity-0 transition-opacity group-hover:opacity-100 hover:bg-transparent hover:text-destructive cursor-pointer",
+            isDeleting && "opacity-100",
+          )}
+          aria-label={`Delete note: ${note.title}`}
+        >
+          {isDeleting ? (
+            <Loader2 className="size-4 animate-spin" />
+          ) : (
+            <Trash2 className="size-4" />
+          )}
+        </Button>
+      ) : null}
       <CardHeader className="gap-2 py-4">
         <div className="flex items-start justify-between gap-3">
           <CardTitle className="font-serif text-base leading-snug">
@@ -105,7 +148,7 @@ function NoteCard({
           </CardTitle>
           {showSimilarity && note.similarity !== undefined ? (
             <span className="bg-secondary text-secondary-foreground shrink-0 rounded-sm border border-border px-2 py-1 text-xs tabular-nums">
-              {Math.round(note.similarity * 100)}% match
+              {Math.round(Number(note.similarity) * 100)}% match
             </span>
           ) : null}
         </div>
@@ -117,6 +160,63 @@ function NoteCard({
   );
 }
 
+function SimilarNotesPanel({
+  showSimilarPanel,
+  isSearching,
+  similarNotes,
+  className,
+  emptyMessage = "Start typing in the box. Matches show up here.",
+  onDelete,
+  deletingId,
+}: {
+  showSimilarPanel: boolean;
+  isSearching: boolean;
+  similarNotes: Note[];
+  className?: string;
+  emptyMessage?: string;
+  onDelete?: (id: string) => void;
+  deletingId?: string | null;
+}) {
+  return (
+    <section className={className}>
+      <div className="mb-4 flex items-center gap-2">
+        <Sparkles className="text-primary size-4" />
+        <h2 className="font-serif text-lg">Similar notes</h2>
+      </div>
+
+      {!showSimilarPanel ? (
+        <Card className="retro-paper">
+          <CardContent className="text-muted-foreground py-8 text-sm leading-6">
+            {emptyMessage}
+          </CardContent>
+        </Card>
+      ) : isSearching ? (
+        <Card className="retro-paper">
+          <CardContent className="text-muted-foreground flex items-center gap-2 py-8 text-sm">
+            <Loader2 className="size-4 animate-spin" />
+            Looking through your notes...
+          </CardContent>
+        </Card>
+      ) : (
+        <motion.div layout className="flex flex-col gap-3">
+          <AnimatePresence initial={false} mode="popLayout">
+            {similarNotes.map((note) => (
+              <AnimatedNoteItem key={note.id}>
+                <NoteCard
+                  note={note}
+                  showSimilarity
+                  onDelete={onDelete}
+                  isDeleting={deletingId === note.id}
+                />
+              </AnimatedNoteItem>
+            ))}
+          </AnimatePresence>
+        </motion.div>
+      )}
+    </section>
+  );
+}
+
 export function NoteComposer() {
   const [text, setText] = useState("");
   const [allNotes, setAllNotes] = useState<Note[]>([]);
@@ -124,6 +224,7 @@ export function NoteComposer() {
   const [isLoadingNotes, setIsLoadingNotes] = useState(true);
   const [isSearching, setIsSearching] = useState(false);
   const [isCreating, setIsCreating] = useState(false);
+  const [deletingId, setDeletingId] = useState<string | null>(null);
   const [message, setMessage] = useState<string | null>(null);
 
   const groupedNotes = useMemo(() => groupNotesByDate(allNotes), [allNotes]);
@@ -224,6 +325,26 @@ export function NoteComposer() {
     }
   }, [text, loadAllNotes]);
 
+  const handleDelete = useCallback(async (id: string) => {
+    setDeletingId(id);
+    setMessage(null);
+
+    try {
+      const response = await fetch(`/api/notes/${id}`, { method: "DELETE" });
+
+      if (!response.ok) {
+        throw new Error("Delete failed");
+      }
+
+      setAllNotes((notes) => notes.filter((note) => note.id !== id));
+      setSimilarNotes((notes) => notes.filter((note) => note.id !== id));
+    } catch {
+      setMessage("Could not delete note. Try again.");
+    } finally {
+      setDeletingId(null);
+    }
+  }, []);
+
   const hasText = text.trim().length > 0;
   const showSimilarPanel = hasText && (isSearching || similarNotes.length > 0);
 
@@ -299,6 +420,17 @@ export function NoteComposer() {
           </CardContent>
         </Card>
 
+        {showSimilarPanel ? (
+          <SimilarNotesPanel
+            showSimilarPanel={showSimilarPanel}
+            isSearching={isSearching}
+            similarNotes={similarNotes}
+            className="flex flex-col lg:hidden"
+            onDelete={handleDelete}
+            deletingId={deletingId}
+          />
+        ) : null}
+
         <section className="flex flex-col gap-5">
           <div className="flex items-center gap-2">
             <CalendarDays className="text-primary size-4" />
@@ -319,48 +451,49 @@ export function NoteComposer() {
               </CardContent>
             </Card>
           ) : (
-            groupedNotes.map((group) => (
-              <div key={group.label} className="flex flex-col gap-3">
-                <h3 className="text-muted-foreground text-xs font-medium tracking-[0.2em] uppercase">
-                  {group.label}
-                </h3>
-                <div className="flex flex-col gap-3">
-                  {group.notes.map((note) => (
-                    <NoteCard key={note.id} note={note} />
-                  ))}
-                </div>
-              </div>
-            ))
+            <AnimatePresence initial={false} mode="popLayout">
+              {groupedNotes.map((group) => (
+                <motion.div
+                  key={group.label}
+                  layout
+                  initial={{ opacity: 0, y: -10 }}
+                  animate={{ opacity: 1, y: 0 }}
+                  exit={{ opacity: 0, y: 10 }}
+                  transition={{ ...noteListTransition, ...noteLayoutTransition }}
+                  className="flex flex-col gap-3"
+                >
+                  <h3 className="text-muted-foreground text-xs font-medium tracking-[0.2em] uppercase">
+                    {group.label}
+                  </h3>
+                  <div className="flex flex-col gap-3">
+                    <AnimatePresence initial={false} mode="popLayout">
+                      {group.notes.map((note) => (
+                        <AnimatedNoteItem key={note.id}>
+                          <NoteCard
+                            note={note}
+                            onDelete={handleDelete}
+                            isDeleting={deletingId === note.id}
+                          />
+                        </AnimatedNoteItem>
+                      ))}
+                    </AnimatePresence>
+                  </div>
+                </motion.div>
+              ))}
+            </AnimatePresence>
           )}
         </section>
       </div>
 
-      <aside className="flex flex-col gap-4 lg:sticky lg:top-8">
-        <div className="flex items-center gap-2">
-          <Sparkles className="text-primary size-4" />
-          <h2 className="font-serif text-lg">Similar notes</h2>
-        </div>
-
-        {!showSimilarPanel ? (
-          <Card className="retro-paper">
-            <CardContent className="text-muted-foreground py-8 text-sm leading-6">
-              Start typing in the box. Matches show up here on the right.
-            </CardContent>
-          </Card>
-        ) : isSearching ? (
-          <Card className="retro-paper">
-            <CardContent className="text-muted-foreground flex items-center gap-2 py-8 text-sm">
-              <Loader2 className="size-4 animate-spin" />
-              Looking through your notes...
-            </CardContent>
-          </Card>
-        ) : (
-          <div className="flex flex-col gap-3">
-            {similarNotes.map((note) => (
-              <NoteCard key={note.id} note={note} showSimilarity />
-            ))}
-          </div>
-        )}
+      <aside className="hidden flex-col gap-4 lg:sticky lg:top-8 lg:flex">
+        <SimilarNotesPanel
+          showSimilarPanel={showSimilarPanel}
+          isSearching={isSearching}
+          similarNotes={similarNotes}
+          emptyMessage="Start typing in the box. Matches show up here on the right."
+          onDelete={handleDelete}
+          deletingId={deletingId}
+        />
       </aside>
     </div>
   );
